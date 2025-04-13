@@ -35,22 +35,22 @@ struct Block {
     Block(): elements{}, previous{nullptr}, next{nullptr}, size{0} {}
 };
 
-struct IndexTable {
+struct IndexTableRow {
     Block *block;
     int Element_index;
     int Block_index;
 
     void clear(){
-        delete block;
+        block = nullptr;
         Element_index = -1;
         Block_index = -1;
     }
 
-    IndexTable(): block{nullptr}, Element_index{-1}, Block_index{-1} {}
+    IndexTableRow(): block{nullptr}, Element_index{-1}, Block_index{-1} {}
 };
 
 struct BlockList {
-    IndexTable table[INDEX_TABLE_SIZE];
+    IndexTableRow table[INDEX_TABLE_SIZE];
     Block *head;
     Block *tail;
     int BlocksNumber;
@@ -59,6 +59,7 @@ struct BlockList {
     BlockList(): table{}, head{nullptr}, tail{nullptr}, BlocksNumber{0}, Size{0} {}
 
     void updateIndexTable(){
+        for (int i = 0; i < 8; i++) table[i].clear();
         int step = max(1, BlocksNumber / INDEX_TABLE_SIZE);
         Block *current = head;
         int count = 0;
@@ -123,7 +124,7 @@ struct BlockList {
             Size++;
         }
         updateIndexTable();
-
+        cout << "Элемент добавлен!\n";
     }
 
     void push_front(Element el){
@@ -155,6 +156,7 @@ struct BlockList {
             Size++;
         }
         updateIndexTable();
+        cout << "Элемент добавлен!\n";
     }
 
     void InsertAt(Element el, int index){
@@ -163,12 +165,74 @@ struct BlockList {
         int ind = par.second;
         index -= ind;
         index--;
-        block->elements[index].print();
-
+        if (block->size != BLOCK_SIZE) {
+            for (int i = block->size; i > index; i--){
+                block->elements[i] = block->elements[i - 1];
+            }
+            block->elements[index] = el;
+            block->size++;
+        }
+        else {
+            Block* newBlock = new Block;
+            if (block->next != nullptr){
+                block->next->previous = newBlock;
+                newBlock->next = block->next;
+                block->next = newBlock;
+                newBlock->previous = block;
+            }
+            else {
+                block->next = newBlock;
+                newBlock->previous = block;
+            }
+            newBlock->elements[0] = block->elements[block->size - 1];
+            newBlock->size++;
+            for (int i = block->size - 1; i > index; i--){
+                block->elements[i] = block->elements[i - 1];
+            }
+            block->elements[index] = el;
+            BlocksNumber++;
+        }
+        Size++;
+        updateIndexTable();
     }
 
     void DeleteAt(int index){
-
+        pair<Block*, int> par = Search(index);
+        Block* block = par.first;
+        int ind = par.second;
+        index -= ind;
+        index--;
+        if (block->size == 1){
+            if (block->previous != nullptr && block->next != nullptr){
+                block->previous->next = block->next;
+                block->next->previous = block->previous;
+                delete block;
+            }
+            else if (block->previous != nullptr){
+                block->previous->next = nullptr;
+                tail = block->previous;
+                delete block;
+            }
+            else if (block->next != nullptr){
+                block->next->previous = nullptr;
+                head = block->next;
+                delete block;
+            }
+            else {
+                delete block;
+                head = nullptr;
+                tail = nullptr;
+            }
+            BlocksNumber--;
+        }
+        else {
+            for (int i = index; i < block->size - 1; i++){
+                block->elements[i] = block->elements[i + 1];
+            }
+            block->size--;
+        }
+        Size--;
+        updateIndexTable();
     }
 
     void UpdateAt(Element el, int index){
@@ -228,7 +292,7 @@ struct BlockList {
         cout << "Индексная таблица:\n";
         for (int i = 0; i < INDEX_TABLE_SIZE; i++){
             if (table[i].block != nullptr){
-                cout << table[i].Element_index << " " << table[i].Block_index << " " << table[i].block << '\n';
+                cout << table[i].Element_index + 1 << " " << table[i].Block_index + 1 << " " << table[i].block << '\n';
             }
         }
     }
